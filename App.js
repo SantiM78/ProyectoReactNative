@@ -46,11 +46,7 @@ function getLocationLabel(entry) {
     return entry.placeName;
   }
 
-  if (entry.location) {
-    return `${entry.location.latitude.toFixed(4)}, ${entry.location.longitude.toFixed(4)}`;
-  }
-
-  return 'Ubicacion no disponible';
+  return 'Barrio o localidad no disponible';
 }
 
 function buildPlaceName(address) {
