@@ -15,6 +15,15 @@ Aplicacion React Native con Expo para registrar evidencias visuales en una bitac
 - Cada registro permite guardar una descripcion opcional de hasta 180 caracteres.
 - La descripcion se guarda localmente y puede dejarse vacia sin bloquear la captura.
 
+## Estructura del proyecto
+
+- `App.js`: controla permisos, estado global, captura, almacenamiento y persistencia.
+- `src/screens/HomeScreen.js`: pantalla principal de la bitacora.
+- `src/components/`: componentes reutilizables como tarjetas, metricas, camara y modal de detalle.
+- `src/styles/styles.js`: estilos centralizados con `StyleSheet`.
+- `src/constants/app.js`: constantes de almacenamiento, estados y limites.
+- `src/utils/location.js`: funciones para mostrar barrio/localidad.
+
 ## Animaciones con React Native Reanimated
 
 - Entrada animada del encabezado con opacidad y desplazamiento.

@@ -1,104 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import Animated, {
   interpolate,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withRepeat,
   withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
-const STORAGE_KEY = '@bitacora_sensorial/entries';
-const ALBUM_DIR = `${FileSystem.documentDirectory}bitacora-sensorial/`;
-
-const moodOptions = [
-  { label: 'Enfoque', color: '#31a36b' },
-  { label: 'Energia', color: '#f59e0b' },
-  { label: 'Calma', color: '#2563eb' },
-];
-
-function getLocationLabel(entry) {
-  if (entry.placeName) {
-    return entry.placeName;
-  }
-
-  return 'Barrio o localidad no disponible';
-}
-
-function buildPlaceName(address) {
-  const neighborhood = address.district || address.subregion || address.name;
-  const locality = address.city || address.region;
-  const country = address.country;
-  return [neighborhood, locality, country].filter(Boolean).join(', ');
-}
-
-function Metric({ label, value }) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function EntryCard({ entry, index, onOpen }) {
-  const progress = useSharedValue(0);
-
-  useEffect(() => {
-    progress.value = withDelay(index * 80, withTiming(1, { duration: 520 }));
-  }, [index, progress]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      { translateY: interpolate(progress.value, [0, 1], [18, 0]) },
-      { scale: interpolate(progress.value, [0, 1], [0.96, 1]) },
-    ],
-  }));
-
-  return (
-    <Animated.View style={[styles.entryCard, animatedStyle]}>
-      <Pressable style={styles.entryPressable} onPress={onOpen}>
-      <Image source={{ uri: entry.uri }} style={styles.entryImage} />
-      <View style={styles.entryInfo}>
-        <View style={[styles.moodDot, { backgroundColor: entry.moodColor }]} />
-        <View style={styles.entryTextBlock}>
-          <Text style={styles.entryTitle}>{entry.mood}</Text>
-          <Text style={styles.entryMeta}>{entry.createdAt}</Text>
-          <Text style={styles.entryMeta} numberOfLines={1}>{getLocationLabel(entry)}</Text>
-          <Text style={styles.entryHint} numberOfLines={1}>
-            {entry.description ? entry.description : 'Toca para abrir y agregar descripcion'}
-          </Text>
-        </View>
-      </View>
-      </Pressable>
-    </Animated.View>
-  );
-}
+import { CameraCapture } from './src/components/CameraCapture';
+import { ALBUM_DIR, MAX_ENTRIES, moodOptions, STORAGE_KEY } from './src/constants/app';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { buildPlaceName } from './src/utils/location';
 
 export default function App() {
   const cameraRef = useRef(null);
@@ -122,7 +43,7 @@ export default function App() {
   const stats = useMemo(
     () => ({
       captures: entries.length,
-      located: entries.filter((entry) => entry.location).length,
+      located: entries.filter((entry) => entry.placeName).length,
       moods: new Set(entries.map((entry) => entry.mood)).size,
     }),
     [entries]
@@ -184,9 +105,7 @@ export default function App() {
 
     const cleanDescription = descriptionDraft.trim();
     const nextEntries = entries.map((entry) =>
-      entry.id === selectedEntry.id
-        ? { ...entry, description: cleanDescription }
-        : entry
+      entry.id === selectedEntry.id ? { ...entry, description: cleanDescription } : entry
     );
 
     await persistEntries(nextEntries);
@@ -266,7 +185,7 @@ export default function App() {
         }).format(new Date()),
       };
 
-      await persistEntries([entry, ...entries].slice(0, 12));
+      await persistEntries([entry, ...entries].slice(0, MAX_ENTRIES));
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsCameraOpen(false);
     } catch (error) {
@@ -314,551 +233,35 @@ export default function App() {
 
   if (isCameraOpen) {
     return (
-      <View style={styles.cameraScreen}>
-        <CameraView ref={cameraRef} style={styles.camera} facing="back" />
-        <SafeAreaView style={styles.cameraOverlay}>
-          <View style={styles.cameraTopBar}>
-            <Pressable style={styles.ghostButton} onPress={() => setIsCameraOpen(false)}>
-              <Text style={styles.ghostButtonText}>Cerrar</Text>
-            </Pressable>
-            <Text style={styles.cameraMood}>{selectedMood.label}</Text>
-          </View>
-
-          <Animated.View style={[styles.shutterOuter, captureButtonStyle]}>
-            <Pressable style={styles.shutter} onPress={takePhoto} disabled={isCapturing}>
-              {isCapturing ? <ActivityIndicator color="#111827" /> : <View style={styles.shutterCore} />}
-            </Pressable>
-          </Animated.View>
-        </SafeAreaView>
-        <StatusBar style="light" />
-      </View>
+      <CameraCapture
+        cameraRef={cameraRef}
+        captureButtonStyle={captureButtonStyle}
+        isCapturing={isCapturing}
+        selectedMood={selectedMood}
+        onClose={() => setIsCameraOpen(false)}
+        onTakePhoto={takePhoto}
+      />
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View style={[styles.hero, heroStyle]}>
-          <Text style={styles.kicker}>Proyecto React Native</Text>
-          <Text style={styles.title}>Bitacora Sensorial</Text>
-          <Text style={styles.subtitle}>
-            Captura evidencias con camara, guardalas internamente y agrega contexto del
-            dispositivo para una sustentacion completa.
-          </Text>
-        </Animated.View>
-
-        <View style={styles.metricsRow}>
-          <Metric label="capturas" value={stats.captures} />
-          <Metric label="ubicadas" value={stats.located} />
-          <Metric label="estados" value={stats.moods} />
-        </View>
-
-        <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>Estado de la evidencia</Text>
-          <View style={styles.segmented}>
-            <Animated.View style={[styles.segmentIndicator, accentStyle]} />
-            {moodOptions.map((mood, index) => (
-              <Pressable
-                key={mood.label}
-                style={styles.segment}
-                onPress={async () => {
-                  setMoodIndex(index);
-                  await Haptics.selectionAsync();
-                }}
-              >
-                <Text style={[styles.segmentText, moodIndex === index && styles.segmentTextActive]}>
-                  {mood.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.actionRow}>
-          <Animated.View style={[styles.primaryActionWrap, captureButtonStyle]}>
-            <Pressable style={styles.primaryAction} onPress={openCamera}>
-              <Text style={styles.primaryActionText}>Abrir camara</Text>
-            </Pressable>
-          </Animated.View>
-          <Pressable style={styles.secondaryAction} onPress={clearLog}>
-            <Text style={styles.secondaryActionText}>Limpiar</Text>
-          </Pressable>
-        </View>
-
-        {lastEntry ? (
-          <Pressable style={styles.previewPanel} onPress={() => openEntry(lastEntry)}>
-            <Image source={{ uri: lastEntry.uri }} style={styles.previewImage} />
-            <View style={styles.previewCopy}>
-              <Text style={styles.previewTitle}>Ultima captura</Text>
-              <Text style={styles.previewText}>{lastEntry.createdAt}</Text>
-              <Text style={styles.previewText}>{lastEntry.mood}</Text>
-              <Text style={styles.previewText}>{getLocationLabel(lastEntry)}</Text>
-              <Text style={styles.previewHint}>
-                {lastEntry.description ? lastEntry.description : 'Toca para agregar descripcion'}
-              </Text>
-            </View>
-          </Pressable>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Aun no hay evidencias</Text>
-            <Text style={styles.emptyText}>
-              La primera foto activa camara, almacenamiento interno, ubicacion y haptics.
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.entriesHeader}>
-          <Text style={styles.sectionTitle}>Registros guardados</Text>
-          <Text style={styles.counter}>{entries.length}/12</Text>
-        </View>
-
-        {entries.map((entry, index) => (
-          <EntryCard key={entry.id} entry={entry} index={index} onOpen={() => openEntry(entry)} />
-        ))}
-      </ScrollView>
-
-      <Modal visible={!!selectedEntry} animationType="slide" transparent onRequestClose={closeEntry}>
-        <KeyboardAvoidingView
-          style={styles.modalBackdrop}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.detailSheet}>
-            {selectedEntry ? (
-              <>
-                <Image source={{ uri: selectedEntry.uri }} style={styles.detailImage} />
-                <View style={styles.detailBody}>
-                  <View style={styles.detailHeader}>
-                    <View>
-                      <Text style={styles.detailTitle}>{selectedEntry.mood}</Text>
-                      <Text style={styles.detailMeta}>{selectedEntry.createdAt}</Text>
-                    </View>
-                    <Pressable style={styles.closeButton} onPress={closeEntry}>
-                      <Text style={styles.closeButtonText}>Cerrar</Text>
-                    </Pressable>
-                  </View>
-
-                  <View style={styles.placeBox}>
-                    <Text style={styles.placeLabel}>Barrio o localidad</Text>
-                    <Text style={styles.placeText}>{getLocationLabel(selectedEntry)}</Text>
-                  </View>
-
-                  <Text style={styles.inputLabel}>Descripcion opcional</Text>
-                  <TextInput
-                    style={styles.descriptionInput}
-                    value={descriptionDraft}
-                    onChangeText={setDescriptionDraft}
-                    multiline
-                    maxLength={180}
-                    placeholder="Ej: Evidencia tomada durante la practica..."
-                    placeholderTextColor="#87918a"
-                    textAlignVertical="top"
-                  />
-                  <Text style={styles.characterCounter}>{descriptionDraft.length}/180</Text>
-
-                  <Pressable style={styles.saveButton} onPress={saveDescription}>
-                    <Text style={styles.saveButtonText}>Guardar descripcion</Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : null}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </SafeAreaView>
+    <HomeScreen
+      accentStyle={accentStyle}
+      captureButtonStyle={captureButtonStyle}
+      descriptionDraft={descriptionDraft}
+      entries={entries}
+      heroStyle={heroStyle}
+      lastEntry={lastEntry}
+      moodIndex={moodIndex}
+      onChangeDescription={setDescriptionDraft}
+      onClearLog={clearLog}
+      onCloseEntry={closeEntry}
+      onOpenCamera={openCamera}
+      onOpenEntry={openEntry}
+      onSaveDescription={saveDescription}
+      onSelectMood={setMoodIndex}
+      selectedEntry={selectedEntry}
+      stats={stats}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#f4f7f3',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 36,
-    gap: 16,
-  },
-  hero: {
-    paddingTop: 18,
-    gap: 8,
-  },
-  kicker: {
-    color: '#2f6f4e',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: '#16211b',
-    fontSize: 38,
-    fontWeight: '900',
-    letterSpacing: 0,
-  },
-  subtitle: {
-    color: '#52605a',
-    fontSize: 16,
-    lineHeight: 23,
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  metric: {
-    flex: 1,
-    minHeight: 78,
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde6dd',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  metricValue: {
-    color: '#172019',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  metricLabel: {
-    color: '#6d7771',
-    fontSize: 12,
-    marginTop: 2,
-    textTransform: 'uppercase',
-  },
-  panel: {
-    gap: 12,
-  },
-  sectionTitle: {
-    color: '#172019',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  segmented: {
-    height: 48,
-    width: 288,
-    borderRadius: 8,
-    backgroundColor: '#e1e9e1',
-    flexDirection: 'row',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  segmentIndicator: {
-    position: 'absolute',
-    left: 4,
-    top: 4,
-    width: 88,
-    height: 40,
-    borderRadius: 7,
-  },
-  segment: {
-    width: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentText: {
-    color: '#506057',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  segmentTextActive: {
-    color: '#ffffff',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-  },
-  primaryActionWrap: {
-    flex: 1,
-  },
-  primaryAction: {
-    height: 56,
-    borderRadius: 8,
-    backgroundColor: '#172019',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryActionText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  secondaryAction: {
-    height: 56,
-    minWidth: 96,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#bdcabc',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  secondaryActionText: {
-    color: '#243028',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  previewPanel: {
-    backgroundColor: '#172019',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  previewImage: {
-    width: '100%',
-    height: 230,
-  },
-  previewCopy: {
-    padding: 16,
-    gap: 4,
-  },
-  previewTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  previewText: {
-    color: '#c8d6ce',
-    fontSize: 14,
-  },
-  previewHint: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '800',
-    marginTop: 6,
-  },
-  emptyState: {
-    minHeight: 150,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccd9ca',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 6,
-  },
-  emptyTitle: {
-    color: '#18251d',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  emptyText: {
-    color: '#66726b',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  entriesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  counter: {
-    color: '#68746d',
-    fontWeight: '800',
-  },
-  entryCard: {
-    minHeight: 104,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#dde6dd',
-    overflow: 'hidden',
-  },
-  entryPressable: {
-    flexDirection: 'row',
-    minHeight: 104,
-  },
-  entryImage: {
-    width: 104,
-    height: 104,
-  },
-  entryInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 10,
-    padding: 12,
-    alignItems: 'center',
-  },
-  moodDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  entryTextBlock: {
-    flex: 1,
-    gap: 3,
-  },
-  entryTitle: {
-    color: '#172019',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  entryMeta: {
-    color: '#66726b',
-    fontSize: 12,
-  },
-  entryHint: {
-    color: '#2f6f4e',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(12, 18, 14, 0.72)',
-    justifyContent: 'flex-end',
-  },
-  detailSheet: {
-    maxHeight: '92%',
-    backgroundColor: '#f4f7f3',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    overflow: 'hidden',
-  },
-  detailImage: {
-    width: '100%',
-    height: 290,
-  },
-  detailBody: {
-    padding: 18,
-    gap: 14,
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  detailTitle: {
-    color: '#172019',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  detailMeta: {
-    color: '#66726b',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  closeButton: {
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#bdcabc',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  closeButtonText: {
-    color: '#243028',
-    fontWeight: '900',
-  },
-  placeBox: {
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde6dd',
-    padding: 14,
-    gap: 4,
-  },
-  placeLabel: {
-    color: '#6d7771',
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  placeText: {
-    color: '#172019',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  inputLabel: {
-    color: '#172019',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  descriptionInput: {
-    minHeight: 104,
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#bdcabc',
-    color: '#172019',
-    fontSize: 15,
-    lineHeight: 21,
-    padding: 14,
-  },
-  characterCounter: {
-    color: '#66726b',
-    fontSize: 12,
-    textAlign: 'right',
-    marginTop: -8,
-  },
-  saveButton: {
-    height: 52,
-    borderRadius: 8,
-    backgroundColor: '#172019',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  cameraScreen: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-    padding: 20,
-  },
-  cameraTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  ghostButton: {
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  ghostButtonText: {
-    color: '#ffffff',
-    fontWeight: '900',
-  },
-  cameraMood: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '900',
-    textShadowColor: 'rgba(0, 0, 0, 0.55)',
-    textShadowRadius: 8,
-  },
-  shutterOuter: {
-    alignSelf: 'center',
-    marginBottom: 18,
-  },
-  shutter: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shutterCore: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    borderWidth: 3,
-    borderColor: '#172019',
-  },
-});
