@@ -6,8 +6,14 @@ Aplicacion React Native con Expo para registrar evidencias visuales en una bitac
 
 - Camara: captura fotografias desde la camara trasera.
 - Almacenamiento interno: guarda imagenes en `FileSystem.documentDirectory` y metadatos en `AsyncStorage`.
-- Ubicacion: registra coordenadas de cada captura cuando el permiso esta activo.
+- Ubicacion: convierte las coordenadas en barrio, localidad o ciudad con geocodificacion inversa.
 - Haptics/vibracion: confirma seleccion, apertura de camara y captura exitosa.
+
+## Gestion de fotos
+
+- Cada foto guardada se puede abrir desde la lista o desde la ultima captura.
+- Cada registro permite guardar una descripcion opcional de hasta 180 caracteres.
+- La descripcion se guarda localmente y puede dejarse vacia sin bloquear la captura.
 
 ## Animaciones con React Native Reanimated
 

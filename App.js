@@ -9,11 +9,15 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Animated, {
@@ -37,6 +41,25 @@ const moodOptions = [
   { label: 'Calma', color: '#2563eb' },
 ];
 
+function getLocationLabel(entry) {
+  if (entry.placeName) {
+    return entry.placeName;
+  }
+
+  if (entry.location) {
+    return `${entry.location.latitude.toFixed(4)}, ${entry.location.longitude.toFixed(4)}`;
+  }
+
+  return 'Ubicacion no disponible';
+}
+
+function buildPlaceName(address) {
+  const neighborhood = address.district || address.subregion || address.name;
+  const locality = address.city || address.region;
+  const country = address.country;
+  return [neighborhood, locality, country].filter(Boolean).join(', ');
+}
+
 function Metric({ label, value }) {
   return (
     <View style={styles.metric}>
@@ -46,7 +69,7 @@ function Metric({ label, value }) {
   );
 }
 
-function EntryCard({ entry, index }) {
+function EntryCard({ entry, index, onOpen }) {
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -63,19 +86,20 @@ function EntryCard({ entry, index }) {
 
   return (
     <Animated.View style={[styles.entryCard, animatedStyle]}>
+      <Pressable style={styles.entryPressable} onPress={onOpen}>
       <Image source={{ uri: entry.uri }} style={styles.entryImage} />
       <View style={styles.entryInfo}>
         <View style={[styles.moodDot, { backgroundColor: entry.moodColor }]} />
         <View style={styles.entryTextBlock}>
           <Text style={styles.entryTitle}>{entry.mood}</Text>
           <Text style={styles.entryMeta}>{entry.createdAt}</Text>
-          <Text style={styles.entryMeta}>
-            {entry.location
-              ? `${entry.location.latitude.toFixed(4)}, ${entry.location.longitude.toFixed(4)}`
-              : 'Ubicacion no disponible'}
+          <Text style={styles.entryMeta} numberOfLines={1}>{getLocationLabel(entry)}</Text>
+          <Text style={styles.entryHint} numberOfLines={1}>
+            {entry.description ? entry.description : 'Toca para abrir y agregar descripcion'}
           </Text>
         </View>
       </View>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -88,6 +112,8 @@ export default function App() {
   const [moodIndex, setMoodIndex] = useState(0);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [selectedEntryId, setSelectedEntryId] = useState(null);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
 
   const intro = useSharedValue(0);
   const pulse = useSharedValue(1);
@@ -95,6 +121,7 @@ export default function App() {
 
   const selectedMood = moodOptions[moodIndex];
   const lastEntry = entries[0];
+  const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
 
   const stats = useMemo(
     () => ({
@@ -134,6 +161,43 @@ export default function App() {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextEntries));
   };
 
+  const resolvePlaceName = async (coords) => {
+    try {
+      const [address] = await Location.reverseGeocodeAsync(coords);
+      return address ? buildPlaceName(address) : '';
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const openEntry = async (entry) => {
+    await Haptics.selectionAsync();
+    setSelectedEntryId(entry.id);
+    setDescriptionDraft(entry.description || '');
+  };
+
+  const closeEntry = () => {
+    setSelectedEntryId(null);
+    setDescriptionDraft('');
+  };
+
+  const saveDescription = async () => {
+    if (!selectedEntry) {
+      return;
+    }
+
+    const cleanDescription = descriptionDraft.trim();
+    const nextEntries = entries.map((entry) =>
+      entry.id === selectedEntry.id
+        ? { ...entry, description: cleanDescription }
+        : entry
+    );
+
+    await persistEntries(nextEntries);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    closeEntry();
+  };
+
   const ensurePermissions = async () => {
     const cameraStatus =
       cameraPermission?.granted || (await requestCameraPermission())?.granted;
@@ -146,7 +210,7 @@ export default function App() {
     }
 
     if (!locationStatus) {
-      Alert.alert('Ubicacion opcional', 'La captura se guardara sin coordenadas.');
+      Alert.alert('Ubicacion opcional', 'La captura se guardara sin barrio o localidad.');
     }
 
     return true;
@@ -180,6 +244,7 @@ export default function App() {
       await FileSystem.copyAsync({ from: photo.uri, to: savedUri });
 
       let location = null;
+      let placeName = '';
       if (locationPermission?.granted) {
         const current = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
@@ -188,6 +253,7 @@ export default function App() {
           latitude: current.coords.latitude,
           longitude: current.coords.longitude,
         };
+        placeName = await resolvePlaceName(location);
       }
 
       const entry = {
@@ -196,6 +262,8 @@ export default function App() {
         mood: selectedMood.label,
         moodColor: selectedMood.color,
         location,
+        placeName,
+        description: '',
         createdAt: new Intl.DateTimeFormat('es-CO', {
           dateStyle: 'medium',
           timeStyle: 'short',
@@ -323,14 +391,18 @@ export default function App() {
         </View>
 
         {lastEntry ? (
-          <View style={styles.previewPanel}>
+          <Pressable style={styles.previewPanel} onPress={() => openEntry(lastEntry)}>
             <Image source={{ uri: lastEntry.uri }} style={styles.previewImage} />
             <View style={styles.previewCopy}>
               <Text style={styles.previewTitle}>Ultima captura</Text>
               <Text style={styles.previewText}>{lastEntry.createdAt}</Text>
               <Text style={styles.previewText}>{lastEntry.mood}</Text>
+              <Text style={styles.previewText}>{getLocationLabel(lastEntry)}</Text>
+              <Text style={styles.previewHint}>
+                {lastEntry.description ? lastEntry.description : 'Toca para agregar descripcion'}
+              </Text>
             </View>
-          </View>
+          </Pressable>
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Aun no hay evidencias</Text>
@@ -346,9 +418,57 @@ export default function App() {
         </View>
 
         {entries.map((entry, index) => (
-          <EntryCard key={entry.id} entry={entry} index={index} />
+          <EntryCard key={entry.id} entry={entry} index={index} onOpen={() => openEntry(entry)} />
         ))}
       </ScrollView>
+
+      <Modal visible={!!selectedEntry} animationType="slide" transparent onRequestClose={closeEntry}>
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.detailSheet}>
+            {selectedEntry ? (
+              <>
+                <Image source={{ uri: selectedEntry.uri }} style={styles.detailImage} />
+                <View style={styles.detailBody}>
+                  <View style={styles.detailHeader}>
+                    <View>
+                      <Text style={styles.detailTitle}>{selectedEntry.mood}</Text>
+                      <Text style={styles.detailMeta}>{selectedEntry.createdAt}</Text>
+                    </View>
+                    <Pressable style={styles.closeButton} onPress={closeEntry}>
+                      <Text style={styles.closeButtonText}>Cerrar</Text>
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.placeBox}>
+                    <Text style={styles.placeLabel}>Barrio o localidad</Text>
+                    <Text style={styles.placeText}>{getLocationLabel(selectedEntry)}</Text>
+                  </View>
+
+                  <Text style={styles.inputLabel}>Descripcion opcional</Text>
+                  <TextInput
+                    style={styles.descriptionInput}
+                    value={descriptionDraft}
+                    onChangeText={setDescriptionDraft}
+                    multiline
+                    maxLength={180}
+                    placeholder="Ej: Evidencia tomada durante la practica..."
+                    placeholderTextColor="#87918a"
+                    textAlignVertical="top"
+                  />
+                  <Text style={styles.characterCounter}>{descriptionDraft.length}/180</Text>
+
+                  <Pressable style={styles.saveButton} onPress={saveDescription}>
+                    <Text style={styles.saveButtonText}>Guardar descripcion</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -505,6 +625,12 @@ const styles = StyleSheet.create({
     color: '#c8d6ce',
     fontSize: 14,
   },
+  previewHint: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 6,
+  },
   emptyState: {
     minHeight: 150,
     borderRadius: 8,
@@ -538,13 +664,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   entryCard: {
-    flexDirection: 'row',
     minHeight: 104,
     backgroundColor: '#ffffff',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#dde6dd',
     overflow: 'hidden',
+  },
+  entryPressable: {
+    flexDirection: 'row',
+    minHeight: 104,
   },
   entryImage: {
     width: 104,
@@ -574,6 +703,113 @@ const styles = StyleSheet.create({
   entryMeta: {
     color: '#66726b',
     fontSize: 12,
+  },
+  entryHint: {
+    color: '#2f6f4e',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(12, 18, 14, 0.72)',
+    justifyContent: 'flex-end',
+  },
+  detailSheet: {
+    maxHeight: '92%',
+    backgroundColor: '#f4f7f3',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: 'hidden',
+  },
+  detailImage: {
+    width: '100%',
+    height: 290,
+  },
+  detailBody: {
+    padding: 18,
+    gap: 14,
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  detailTitle: {
+    color: '#172019',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  detailMeta: {
+    color: '#66726b',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  closeButton: {
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bdcabc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  closeButtonText: {
+    color: '#243028',
+    fontWeight: '900',
+  },
+  placeBox: {
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dde6dd',
+    padding: 14,
+    gap: 4,
+  },
+  placeLabel: {
+    color: '#6d7771',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  placeText: {
+    color: '#172019',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  inputLabel: {
+    color: '#172019',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  descriptionInput: {
+    minHeight: 104,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#bdcabc',
+    color: '#172019',
+    fontSize: 15,
+    lineHeight: 21,
+    padding: 14,
+  },
+  characterCounter: {
+    color: '#66726b',
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: -8,
+  },
+  saveButton: {
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: '#172019',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '900',
   },
   cameraScreen: {
     flex: 1,
