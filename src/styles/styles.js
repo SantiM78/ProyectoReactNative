@@ -254,6 +254,7 @@ export const styles = StyleSheet.create({
   },
   detailBody: {
     padding: 18,
+    paddingBottom: 34,
     gap: 14,
   },
   detailHeader: {

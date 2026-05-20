@@ -4,6 +4,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
@@ -24,13 +25,18 @@ export function PhotoDetailModal({
     <Modal visible={!!entry} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.modalBackdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
       >
         <View style={styles.detailSheet}>
           {entry ? (
             <>
               <Image source={{ uri: entry.uri }} style={styles.detailImage} />
-              <View style={styles.detailBody}>
+              <ScrollView
+                contentContainerStyle={styles.detailBody}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.detailHeader}>
                   <View>
                     <Text style={styles.detailTitle}>{entry.mood}</Text>
@@ -64,7 +70,7 @@ export function PhotoDetailModal({
                 <Pressable style={styles.saveButton} onPress={onSave}>
                   <Text style={styles.saveButtonText}>Guardar descripcion</Text>
                 </Pressable>
-              </View>
+              </ScrollView>
             </>
           ) : null}
         </View>
