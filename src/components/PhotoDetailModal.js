@@ -23,6 +23,7 @@ export function PhotoDetailModal({
 }) {
   return (
     <Modal visible={!!entry} animationType="slide" transparent onRequestClose={onClose}>
+      {/* Ayuda a que el teclado no tape el campo de descripcion. */}
       <KeyboardAvoidingView
         style={styles.modalBackdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -32,12 +33,14 @@ export function PhotoDetailModal({
           {entry ? (
             <>
               <Image source={{ uri: entry.uri }} style={styles.detailImage} />
+              {/* El contenido se puede deslizar si el teclado ocupa espacio. */}
               <ScrollView
                 contentContainerStyle={styles.detailBody}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.detailHeader}>
+                  {/* Encabezado del detalle: estado, fecha y boton cerrar. */}
                   <View>
                     <Text style={styles.detailTitle}>{entry.mood}</Text>
                     <Text style={styles.detailMeta}>{entry.createdAt}</Text>
@@ -47,11 +50,13 @@ export function PhotoDetailModal({
                   </Pressable>
                 </View>
 
+                {/* Lugar convertido a barrio/localidad cuando el celular lo permite. */}
                 <View style={styles.placeBox}>
                   <Text style={styles.placeLabel}>Barrio o localidad</Text>
                   <Text style={styles.placeText}>{getLocationLabel(entry)}</Text>
                 </View>
 
+                {/* Campo opcional: si queda vacio no pasa nada. */}
                 <Text style={styles.inputLabel}>Descripcion opcional</Text>
                 <TextInput
                   style={styles.descriptionInput}

@@ -12,6 +12,7 @@ import { styles } from '../styles/styles';
 import { getLocationLabel } from '../utils/location';
 
 export function EntryCard({ entry, index, onOpen }) {
+  // Cada tarjeta entra con una animacion suave, una despues de la otra.
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -28,11 +29,13 @@ export function EntryCard({ entry, index, onOpen }) {
 
   return (
     <Animated.View style={[styles.entryCard, animatedStyle]}>
+      {/* Al tocar una tarjeta, abrimos la foto en detalle. */}
       <Pressable style={styles.entryPressable} onPress={onOpen}>
         <Image source={{ uri: entry.uri }} style={styles.entryImage} />
         <View style={styles.entryInfo}>
           <View style={[styles.moodDot, { backgroundColor: entry.moodColor }]} />
           <View style={styles.entryTextBlock}>
+            {/* Datos cortos para reconocer rapido la captura. */}
             <Text style={styles.entryTitle}>{entry.mood}</Text>
             <Text style={styles.entryMeta}>{entry.createdAt}</Text>
             <Text style={styles.entryMeta} numberOfLines={1}>

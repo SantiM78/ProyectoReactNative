@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
+  // Pantalla general y contenedor principal.
   screen: {
     flex: 1,
     backgroundColor: '#f4f7f3',
@@ -10,6 +11,7 @@ export const styles = StyleSheet.create({
     paddingBottom: 36,
     gap: 16,
   },
+  // Encabezado de la app.
   hero: {
     paddingTop: 18,
     gap: 8,
@@ -32,6 +34,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 23,
   },
+  // Tarjetas de metricas superiores.
   metricsRow: {
     flexDirection: 'row',
     gap: 10,
@@ -57,6 +60,7 @@ export const styles = StyleSheet.create({
     marginTop: 2,
     textTransform: 'uppercase',
   },
+  // Selector de estado de la evidencia.
   panel: {
     gap: 12,
   },
@@ -95,6 +99,7 @@ export const styles = StyleSheet.create({
   segmentTextActive: {
     color: '#ffffff',
   },
+  // Botones principales de la pantalla.
   actionRow: {
     flexDirection: 'row',
     gap: 12,
@@ -130,6 +135,7 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
+  // Bloque de ultima captura.
   previewPanel: {
     backgroundColor: '#172019',
     borderRadius: 8,
@@ -158,6 +164,7 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 6,
   },
+  // Mensaje cuando aun no hay fotos guardadas.
   emptyState: {
     minHeight: 150,
     borderRadius: 8,
@@ -180,6 +187,7 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'center',
   },
+  // Lista de registros guardados.
   entriesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -236,6 +244,7 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  // Modal para ver la foto y escribir la descripcion.
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(12, 18, 14, 0.72)',
@@ -339,6 +348,7 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
+  // Pantalla de camara y obturador.
   cameraScreen: {
     flex: 1,
     backgroundColor: '#000000',

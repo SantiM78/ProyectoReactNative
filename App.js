@@ -22,9 +22,12 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { buildPlaceName } from './src/utils/location';
 
 export default function App() {
+  // Referencias y permisos que necesita la app para hablar con el celular.
   const cameraRef = useRef(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [locationPermission, requestLocationPermission] = Location.useForegroundPermissions();
+
+  // Estados principales: fotos guardadas, pantalla actual y texto de la descripcion.
   const [entries, setEntries] = useState([]);
   const [moodIndex, setMoodIndex] = useState(0);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -32,14 +35,17 @@ export default function App() {
   const [selectedEntryId, setSelectedEntryId] = useState(null);
   const [descriptionDraft, setDescriptionDraft] = useState('');
 
+  // Valores animados para darle movimiento a la pantalla.
   const intro = useSharedValue(0);
   const pulse = useSharedValue(1);
   const accent = useSharedValue(0);
 
+  // Datos calculados para mostrar lo que el usuario esta viendo.
   const selectedMood = moodOptions[moodIndex];
   const lastEntry = entries[0];
   const selectedEntry = entries.find((entry) => entry.id === selectedEntryId);
 
+  // Numeritos del resumen superior: capturas, ubicadas y estados usados.
   const stats = useMemo(
     () => ({
       captures: entries.length,
@@ -49,6 +55,7 @@ export default function App() {
     [entries]
   );
 
+  // Arranca las animaciones iniciales cuando abre la app.
   useEffect(() => {
     intro.value = withTiming(1, { duration: 800 });
     pulse.value = withRepeat(
@@ -58,26 +65,31 @@ export default function App() {
     );
   }, [intro, pulse]);
 
+  // Mueve el selector de estado cada vez que cambias entre Enfoque, Energia o Calma.
   useEffect(() => {
     accent.value = withSpring(moodIndex, { damping: 14, stiffness: 120 });
   }, [accent, moodIndex]);
 
+  // Carga la bitacora guardada en el telefono.
   const loadEntries = useCallback(async () => {
     const saved = await AsyncStorage.getItem(STORAGE_KEY);
     setEntries(saved ? JSON.parse(saved) : []);
   }, []);
 
+  // Apenas abre la app, intenta traer las fotos guardadas antes.
   useEffect(() => {
     loadEntries().catch(() => {
       Alert.alert('Almacenamiento', 'No se pudo leer la bitacora guardada.');
     });
   }, [loadEntries]);
 
+  // Guarda la lista completa en memoria local para que no se pierda al cerrar.
   const persistEntries = async (nextEntries) => {
     setEntries(nextEntries);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextEntries));
   };
 
+  // Convierte las coordenadas en un nombre mas bonito, como barrio o ciudad.
   const resolvePlaceName = async (coords) => {
     try {
       const [address] = await Location.reverseGeocodeAsync(coords);
@@ -87,17 +99,20 @@ export default function App() {
     }
   };
 
+  // Abre una foto guardada para verla grande y escribirle descripcion.
   const openEntry = async (entry) => {
     await Haptics.selectionAsync();
     setSelectedEntryId(entry.id);
     setDescriptionDraft(entry.description || '');
   };
 
+  // Cierra el detalle y limpia el texto temporal.
   const closeEntry = () => {
     setSelectedEntryId(null);
     setDescriptionDraft('');
   };
 
+  // Guarda la descripcion opcional dentro del registro seleccionado.
   const saveDescription = async () => {
     if (!selectedEntry) {
       return;
@@ -113,6 +128,7 @@ export default function App() {
     closeEntry();
   };
 
+  // Revisa permisos antes de abrir la camara.
   const ensurePermissions = async () => {
     const cameraStatus =
       cameraPermission?.granted || (await requestCameraPermission())?.granted;
@@ -131,6 +147,7 @@ export default function App() {
     return true;
   };
 
+  // Abre la camara solo si los permisos necesarios estan listos.
   const openCamera = async () => {
     const canOpen = await ensurePermissions();
     if (canOpen) {
@@ -139,6 +156,7 @@ export default function App() {
     }
   };
 
+  // Toma la foto, la guarda en almacenamiento interno y crea el registro.
   const takePhoto = async () => {
     if (!cameraRef.current || isCapturing) {
       return;
@@ -149,6 +167,7 @@ export default function App() {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.78 });
 
+      // Si la carpeta de la bitacora no existe, la creamos.
       const folder = await FileSystem.getInfoAsync(ALBUM_DIR);
       if (!folder.exists) {
         await FileSystem.makeDirectoryAsync(ALBUM_DIR, { intermediates: true });
@@ -158,6 +177,7 @@ export default function App() {
       const savedUri = `${ALBUM_DIR}${fileName}`;
       await FileSystem.copyAsync({ from: photo.uri, to: savedUri });
 
+      // Si hay permiso de ubicacion, buscamos el barrio/localidad.
       let location = null;
       let placeName = '';
       if (locationPermission?.granted) {
@@ -171,6 +191,7 @@ export default function App() {
         placeName = await resolvePlaceName(location);
       }
 
+      // Este es el objeto que representa una foto dentro de la bitacora.
       const entry = {
         id: fileName,
         uri: savedUri,
@@ -185,6 +206,7 @@ export default function App() {
         }).format(new Date()),
       };
 
+      // Agrega la captura al inicio y mantiene solo las ultimas entradas.
       await persistEntries([entry, ...entries].slice(0, MAX_ENTRIES));
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsCameraOpen(false);
@@ -195,6 +217,7 @@ export default function App() {
     }
   };
 
+  // Borra todas las fotos/registros guardados por la app.
   const clearLog = async () => {
     await Haptics.selectionAsync();
     Alert.alert('Limpiar bitacora', 'Se eliminaran los registros guardados en la app.', [
@@ -213,15 +236,18 @@ export default function App() {
     ]);
   };
 
+  // Animacion de entrada del encabezado.
   const heroStyle = useAnimatedStyle(() => ({
     opacity: intro.value,
     transform: [{ translateY: interpolate(intro.value, [0, 1], [28, 0]) }],
   }));
 
+  // Animacion de pulso para el boton de camara y el obturador.
   const captureButtonStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
   }));
 
+  // Animacion del selector: cambia color y posicion.
   const accentStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       accent.value,
@@ -231,6 +257,7 @@ export default function App() {
     transform: [{ translateX: interpolate(accent.value, [0, 1, 2], [0, 96, 192]) }],
   }));
 
+  // Cuando la camara esta abierta, mostramos solo esa pantalla.
   if (isCameraOpen) {
     return (
       <CameraCapture
@@ -244,6 +271,7 @@ export default function App() {
     );
   }
 
+  // Pantalla principal de la bitacora.
   return (
     <HomeScreen
       accentStyle={accentStyle}

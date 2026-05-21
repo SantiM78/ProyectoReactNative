@@ -32,6 +32,7 @@ export function HomeScreen({
     <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Encabezado principal de la app. */}
         <Animated.View style={[styles.hero, heroStyle]}>
           <Text style={styles.kicker}>Proyecto React Native</Text>
           <Text style={styles.title}>Bitacora Sensorial</Text>
@@ -41,12 +42,14 @@ export function HomeScreen({
           </Text>
         </Animated.View>
 
+        {/* Resumen rapido de lo que hay guardado. */}
         <View style={styles.metricsRow}>
           <Metric label="capturas" value={stats.captures} />
           <Metric label="ubicadas" value={stats.located} />
           <Metric label="estados" value={stats.moods} />
         </View>
 
+        {/* Selector de estado para clasificar la foto antes de tomarla. */}
         <View style={styles.panel}>
           <Text style={styles.sectionTitle}>Estado de la evidencia</Text>
           <View style={styles.segmented}>
@@ -68,6 +71,7 @@ export function HomeScreen({
           </View>
         </View>
 
+        {/* Acciones principales: abrir camara o limpiar todo. */}
         <View style={styles.actionRow}>
           <Animated.View style={[styles.primaryActionWrap, captureButtonStyle]}>
             <Pressable style={styles.primaryAction} onPress={onOpenCamera}>
@@ -79,6 +83,7 @@ export function HomeScreen({
           </Pressable>
         </View>
 
+        {/* Vista destacada de la ultima captura tomada. */}
         {lastEntry ? (
           <Pressable style={styles.previewPanel} onPress={() => onOpenEntry(lastEntry)}>
             <Image source={{ uri: lastEntry.uri }} style={styles.previewImage} />
@@ -101,6 +106,7 @@ export function HomeScreen({
           </View>
         )}
 
+        {/* Lista completa de registros guardados. */}
         <View style={styles.entriesHeader}>
           <Text style={styles.sectionTitle}>Registros guardados</Text>
           <Text style={styles.counter}>{entries.length}/12</Text>
@@ -116,6 +122,7 @@ export function HomeScreen({
         ))}
       </ScrollView>
 
+      {/* Modal para ver la foto grande y editar la descripcion. */}
       <PhotoDetailModal
         entry={selectedEntry}
         descriptionDraft={descriptionDraft}
